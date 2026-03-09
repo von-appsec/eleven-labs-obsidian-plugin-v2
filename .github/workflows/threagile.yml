@@ -1,0 +1,24 @@
+# .github/workflows/threagile.yml
+name: Threat Model Analysis
+
+on:
+  push:
+    paths:
+      - 'threagile.yaml'   # only runs when threat model changes
+
+jobs:
+  threagile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Threagile
+        uses: threagile/run-threagile-action@v1
+        with:
+          model-file: 'threagile.yaml'
+
+      - name: Archive Threat Model Reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: threagile-report
+          path: threagile/output

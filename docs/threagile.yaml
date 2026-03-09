@@ -1,0 +1,474 @@
+# yaml-language-server: $schema=./schema.json
+threagile_version: 1.0.0
+
+title: Obsidian TTS
+
+date: 2026-03-07
+
+author:
+  name: vonst
+  homepage: ""
+
+management_summary_comment: >
+  Threat model for an Obsidian TypeScript plugin that sends selected note text to ElevenLabs API and writes generated MP3 files into the vault.
+
+business_criticality: important # values: archive, operational, important, critical, mission-critical
+
+business_overview:
+  description: >
+    The plugin converts user-selected text from notes into audio using ElevenLabs and stores resulting MP3 files in the local vault.
+  images:
+
+technical_overview:
+  description: >
+    Main flow: Obsidian user -> plugin runtime -> ElevenLabs API (HTTPS) -> plugin writes MP3 to local vault.
+  images:
+
+questions: # simply use "" as answer to signal "unanswered"
+  How are user endpoints managed/protected against compromise?: ""
+  How are plugin logs protected from secret leakage?: ""
+  How is plugin setting storage (including API key) hardened?: ""
+
+abuse_cases:
+  API Key Theft: >
+    As an attacker I want to obtain the ElevenLabs API key from local settings or logs to abuse the account.
+  Vault Path Traversal: >
+    As an attacker I want to control output paths and overwrite unintended files in the vault.
+  Sensitive Data Exfiltration: >
+    As an attacker I want to exfiltrate sensitive note content via API requests or generated artifacts.
+
+security_requirements:
+  Protect Secrets at Rest: API keys must not be stored in plaintext without compensating controls.
+  Input and Path Validation: Output paths and filenames must be validated and normalized.
+  Secret-Safe Logging: Logging must redact secrets and sensitive request metadata.
+
+tags_available:
+  - obsidian
+  - elevenlabs
+  - plugin
+  - typescript
+  - desktop
+  - vault
+
+data_assets:
+
+  Selected Note Text:
+    id: note-selection-text
+    description: User-selected text from Obsidian notes sent for text-to-speech generation.
+    usage: business # values: business, devops
+    tags:
+      - obsidian
+    origin: Obsidian Vault
+    owner: Vault Owner
+    quantity: few # values: very-few, few, many, very-many
+    confidentiality: strictly-confidential # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: important # values: archive, operational, important, critical, mission-critical
+    availability: operational # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      Notes can contain highly sensitive personal or business information. Confidentiality is prioritized,
+      while integrity and availability are important for correct audio generation.
+
+  ElevenLabs API Key:
+    id: elevenlabs-api-key
+    description: API key configured by the user for authentication against ElevenLabs API.
+    usage: devops # values: business, devops
+    tags:
+      - elevenlabs
+    origin: User Configuration
+    owner: Vault Owner
+    quantity: very-few # values: very-few, few, many, very-many
+    confidentiality: strictly-confidential # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: critical # values: archive, operational, important, critical, mission-critical
+    availability: operational # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      Exposure directly enables account abuse and potential billing impact. Integrity is critical to prevent misuse
+      or authentication failures.
+
+  Generated Audio Files:
+    id: generated-audio-files
+    description: MP3 files generated from selected note text and written to the Obsidian vault.
+    usage: business # values: business, devops
+    tags:
+      - elevenlabs
+      - obsidian
+    origin: ElevenLabs API
+    owner: Vault Owner
+    quantity: many # values: very-few, few, many, very-many
+    confidentiality: confidential # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: important # values: archive, operational, important, critical, mission-critical
+    availability: important # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      Audio files may encode sensitive note content. Integrity matters to avoid tampered or mismatched voice output.
+
+  Obsidian Plugin Settings:
+    id: obsidian-plugin-settings
+    description: Plugin configuration in data.json including model and voice configuration.
+    usage: devops # values: business, devops
+    tags:
+      - obsidian
+      - plugin
+    origin: Plugin Runtime
+    owner: Vault Owner
+    quantity: very-few # values: very-few, few, many, very-many
+    confidentiality: confidential # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: critical # values: archive, operational, important, critical, mission-critical
+    availability: important # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      Settings influence output path and API interaction behavior. Unauthorized manipulation can lead to unsafe writes
+      or operational abuse.
+
+  Plugin Execution Logs:
+    id: plugin-execution-logs
+    description: Local runtime and console logs generated by the plugin during execution.
+    usage: devops # values: business, devops
+    tags:
+      - plugin
+    origin: Plugin Runtime
+    owner: Vault Owner
+    quantity: many # values: very-few, few, many, very-many
+    confidentiality: restricted # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: archive # values: archive, operational, important, critical, mission-critical
+    availability: archive # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      Logs support debugging but can expose secrets or sensitive content if not redacted (for example API keys).
+
+technical_assets:
+
+  Obsidian End User:
+    id: obsidian-end-user
+    description: Human user triggering text-to-speech actions from Obsidian UI.
+    type: external-entity # values: external-entity, process, datastore
+    usage: business # values: business, devops
+    used_as_client_by_human: true
+    out_of_scope: true
+    justification_out_of_scope: Human actor operating the local Obsidian application.
+    size: component # values: system, service, application, component
+    technology: desktop # values: see help
+    tags:
+      - obsidian
+    internet: false
+    machine: physical # values: physical, virtual, container, serverless
+    encryption: none # values: none, transparent, data-with-symmetric-shared-key, data-with-asymmetric-shared-key, data-with-enduser-individual-key
+    owner: Vault Owner
+    confidentiality: confidential # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: important # values: archive, operational, important, critical, mission-critical
+    availability: important # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      The user initiates processing and handles potentially sensitive note content in the local desktop environment.
+    multi_tenant: false
+    redundant: false
+    custom_developed_parts: false
+    data_assets_processed:
+      - note-selection-text
+      - generated-audio-files
+    data_assets_stored:
+    data_formats_accepted:
+      - file
+    communication_links:
+      Trigger TTS Command:
+        target: obsidian-plugin-runtime
+        description: User action triggers plugin command with selected note text.
+        protocol: in-process-library-call # values: see help
+        authentication: none # values: none, credentials, session-id, token, client-certificate, two-factor
+        authorization: enduser-identity-propagation # values: none, technical-user, enduser-identity-propagation
+        tags:
+        vpn: false
+        ip_filtered: false
+        readonly: false
+        usage: business # values: business, devops
+        data_assets_sent:
+          - note-selection-text
+        data_assets_received:
+          - generated-audio-files
+
+  Obsidian Plugin Runtime:
+    id: obsidian-plugin-runtime
+    description: TypeScript plugin logic running in Obsidian desktop runtime.
+    type: process # values: external-entity, process, datastore
+    usage: business # values: business, devops
+    used_as_client_by_human: false
+    out_of_scope: false
+    justification_out_of_scope: ""
+    size: component # values: system, service, application, component
+    technology: desktop # values: see help
+    tags:
+      - plugin
+      - typescript
+    internet: true
+    machine: physical # values: physical, virtual, container, serverless
+    encryption: none # values: none, transparent, data-with-symmetric-shared-key, data-with-asymmetric-shared-key, data-with-enduser-individual-key
+    owner: Plugin Maintainer
+    confidentiality: confidential # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: critical # values: archive, operational, important, critical, mission-critical
+    availability: important # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      Runtime processes selected text and API key, performs external API calls, and writes output files to the vault.
+    multi_tenant: false
+    redundant: false
+    custom_developed_parts: true
+    data_assets_processed:
+      - note-selection-text
+      - elevenlabs-api-key
+      - generated-audio-files
+      - obsidian-plugin-settings
+      - plugin-execution-logs
+    data_assets_stored:
+    data_formats_accepted:
+      - json
+      - file
+    communication_links:
+      ElevenLabs TTS API Call:
+        target: elevenlabs-api
+        description: HTTPS request to synthesize note text into audio using API key.
+        protocol: https # values: see help
+        authentication: token # values: none, credentials, session-id, token, client-certificate, two-factor
+        authorization: technical-user # values: none, technical-user, enduser-identity-propagation
+        tags:
+          - elevenlabs
+        vpn: false
+        ip_filtered: false
+        readonly: false
+        usage: business # values: business, devops
+        data_assets_sent:
+          - note-selection-text
+          - elevenlabs-api-key
+        data_assets_received:
+          - generated-audio-files
+      Read or Write Vault Files:
+        target: obsidian-vault-storage
+        description: Local file operations for settings, logs, and generated audio.
+        protocol: local-file-access # values: see help
+        authentication: none # values: none, credentials, session-id, token, client-certificate, two-factor
+        authorization: technical-user # values: none, technical-user, enduser-identity-propagation
+        tags:
+        vpn: false
+        ip_filtered: false
+        readonly: false
+        usage: devops # values: business, devops
+        data_assets_sent:
+          - generated-audio-files
+          - obsidian-plugin-settings
+          - plugin-execution-logs
+          - elevenlabs-api-key
+        data_assets_received:
+          - obsidian-plugin-settings
+          - note-selection-text
+
+  Obsidian Vault Storage:
+    id: obsidian-vault-storage
+    description: Local vault filesystem containing notes, plugin data.json settings, and generated MP3 files.
+    type: datastore # values: external-entity, process, datastore
+    usage: business # values: business, devops
+    used_as_client_by_human: false
+    out_of_scope: false
+    justification_out_of_scope: ""
+    size: application # values: system, service, application, component
+    technology: local-file-system # values: see help
+    tags:
+      - obsidian
+      - vault
+    internet: false
+    machine: physical # values: physical, virtual, container, serverless
+    encryption: none # values: none, transparent, data-with-symmetric-shared-key, data-with-asymmetric-shared-key, data-with-enduser-individual-key
+    owner: Vault Owner
+    confidentiality: strictly-confidential # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: critical # values: archive, operational, important, critical, mission-critical
+    availability: important # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      Stores plaintext plugin settings and API key in data.json and receives generated MP3 files in vault paths.
+    multi_tenant: false
+    redundant: false
+    custom_developed_parts: false
+    data_assets_processed:
+      - note-selection-text
+      - elevenlabs-api-key
+      - generated-audio-files
+      - obsidian-plugin-settings
+      - plugin-execution-logs
+    data_assets_stored:
+      - note-selection-text
+      - elevenlabs-api-key
+      - generated-audio-files
+      - obsidian-plugin-settings
+      - plugin-execution-logs
+    data_formats_accepted:
+      - json
+      - file
+    communication_links:
+
+  ElevenLabs API:
+    id: elevenlabs-api
+    description: External ElevenLabs text-to-speech REST API.
+    type: external-entity # values: external-entity, process, datastore
+    usage: business # values: business, devops
+    used_as_client_by_human: false
+    out_of_scope: true
+    justification_out_of_scope: Third-party SaaS managed by ElevenLabs.
+    size: service # values: system, service, application, component
+    technology: web-service-rest # values: see help
+    tags:
+      - elevenlabs
+    internet: true
+    machine: virtual # values: physical, virtual, container, serverless
+    encryption: none # values: none, transparent, data-with-symmetric-shared-key, data-with-asymmetric-shared-key, data-with-enduser-individual-key
+    owner: ElevenLabs
+    confidentiality: confidential # values: public, internal, restricted, confidential, strictly-confidential
+    integrity: important # values: archive, operational, important, critical, mission-critical
+    availability: important # values: archive, operational, important, critical, mission-critical
+    justification_cia_rating: >
+      Service receives sensitive note text and returns generated audio; availability directly impacts feature behavior.
+    multi_tenant: true
+    redundant: true
+    custom_developed_parts: false
+    data_assets_processed:
+      - note-selection-text
+      - elevenlabs-api-key
+      - generated-audio-files
+    data_assets_stored:
+    data_formats_accepted:
+      - json
+    communication_links:
+
+trust_boundaries:
+
+  Local User Workstation:
+    id: local-user-workstation
+    description: Local execution environment of Obsidian desktop app and vault filesystem.
+    type: execution-environment # values: see help
+    tags:
+      - desktop
+    technical_assets_inside:
+      - obsidian-end-user
+      - obsidian-plugin-runtime
+      - obsidian-vault-storage
+    trust_boundaries_nested:
+
+  ElevenLabs Cloud:
+    id: elevenlabs-cloud
+    description: External cloud environment hosting ElevenLabs API.
+    type: network-cloud-provider # values: see help
+    tags:
+      - elevenlabs
+    technical_assets_inside:
+      - elevenlabs-api
+    trust_boundaries_nested:
+
+shared_runtimes: {}
+
+individual_risk_categories:
+
+  T1 API Key Plaintext in data.json:
+    id: t1-api-key-plaintext-data-json
+    description: API key is stored unencrypted in Obsidian plugin settings (`data.json`).
+    impact: Theft of API key can enable unauthorized API usage, billing abuse, and lateral misuse.
+    asvs: V6 - Stored Cryptography
+    cheat_sheet: https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html
+    action: Avoid plaintext secret persistence; use OS keychain or encrypted-at-rest storage with access controls.
+    mitigation: Migrate API key storage from `data.json` to keychain-backed storage and scrub legacy values.
+    check: Verify no plaintext API key remains in vault `.obsidian/plugins/*/data.json` files.
+    function: architecture # values: business-side, architecture, development, operations
+    stride: information-disclosure # values: spoofing, tampering, repudiation, information-disclosure, denial-of-service, elevation-of-privilege
+    detection_logic: Search local plugin settings for key patterns and verify keychain integration paths.
+    risk_assessment: High likelihood on compromised endpoints with high exploitation impact.
+    false_positives: Placeholder tokens or empty key fields might be misdetected as secrets.
+    model_failure_possible_reason: false
+    cwe: 312
+    risks_identified:
+      API key persisted plaintext in local vault settings:
+        severity: critical # values: low, medium, elevated, high, critical
+        exploitation_likelihood: likely # values: unlikely, likely, very-likely, frequent
+        exploitation_impact: high # values: low, medium, high, very-high
+        data_breach_probability: probable # values: improbable, possible, probable
+        data_breach_technical_assets: # list of technical asset IDs which might have data breach
+          - obsidian-vault-storage
+          - obsidian-plugin-runtime
+        most_relevant_data_asset: elevenlabs-api-key
+        most_relevant_technical_asset: obsidian-vault-storage
+        most_relevant_communication_link:
+        most_relevant_trust_boundary: local-user-workstation
+        most_relevant_shared_runtime:
+
+  T3 Audio Output Path Traversal:
+    id: t3-audio-output-path-traversal
+    description: Unsanitized output paths can allow traversal beyond intended vault location.
+    impact: Overwrite or create arbitrary files in the vault and potentially in adjacent filesystem paths.
+    asvs: V5 - Validation, Sanitization and Encoding
+    cheat_sheet: https://cheatsheetseries.owasp.org/cheatsheets/Input_Validation_Cheat_Sheet.html
+    action: Canonicalize and validate output paths against vault root before write operations.
+    mitigation: Enforce normalized allowlisted path segments and reject traversal patterns (`..`, absolute paths, mixed separators).
+    check: Unit and integration tests prove writes are constrained to vault root on all supported platforms.
+    function: development # values: business-side, architecture, development, operations
+    stride: tampering # values: spoofing, tampering, repudiation, information-disclosure, denial-of-service, elevation-of-privilege
+    detection_logic: Fuzz output path inputs with traversal payloads and assert blocked writes.
+    risk_assessment: Likelihood depends on attacker control over filename/path inputs; impact is high when writes are unconstrained.
+    false_positives: Legitimate nested relative paths inside the vault can resemble traversal attempts.
+    model_failure_possible_reason: false
+    cwe: 22
+    risks_identified:
+      Potential traversal in mp3 vault write path:
+        severity: high # values: low, medium, elevated, high, critical
+        exploitation_likelihood: likely # values: unlikely, likely, very-likely, frequent
+        exploitation_impact: high # values: low, medium, high, very-high
+        data_breach_probability: possible # values: improbable, possible, probable
+        data_breach_technical_assets: # list of technical asset IDs which might have data breach
+          - obsidian-plugin-runtime
+          - obsidian-vault-storage
+        most_relevant_data_asset: generated-audio-files
+        most_relevant_technical_asset: obsidian-plugin-runtime
+        most_relevant_communication_link:
+        most_relevant_trust_boundary: local-user-workstation
+        most_relevant_shared_runtime:
+
+  T8 API Key Leakage in Logs:
+    id: t8-api-key-logging-leak
+    description: API key or sensitive authorization metadata might be emitted into plugin logs/console.
+    impact: Secrets become retrievable by local users, malware, debugging collectors, or log forwarding sinks.
+    asvs: V9 - Communications
+    cheat_sheet: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
+    action: Redact secrets and prohibit logging of authorization headers and raw config blobs.
+    mitigation: Centralized logger with redaction patterns and secure debug-mode gating.
+    check: Automated tests assert log output never contains key patterns or auth header values.
+    function: development # values: business-side, architecture, development, operations
+    stride: information-disclosure # values: spoofing, tampering, repudiation, information-disclosure, denial-of-service, elevation-of-privilege
+    detection_logic: Static and runtime checks for logging sinks containing `apiKey`, `Authorization`, or known token formats.
+    risk_assessment: Common during troubleshooting paths; impact remains high if secrets are exposed.
+    false_positives: Masked or synthetic test keys may trigger simple detectors.
+    model_failure_possible_reason: false
+    cwe: 532
+    risks_identified:
+      Sensitive auth material written to plugin logs:
+        severity: high # values: low, medium, elevated, high, critical
+        exploitation_likelihood: likely # values: unlikely, likely, very-likely, frequent
+        exploitation_impact: high # values: low, medium, high, very-high
+        data_breach_probability: probable # values: improbable, possible, probable
+        data_breach_technical_assets: # list of technical asset IDs which might have data breach
+          - obsidian-plugin-runtime
+          - obsidian-vault-storage
+        most_relevant_data_asset: elevenlabs-api-key
+        most_relevant_technical_asset: obsidian-plugin-runtime
+        most_relevant_communication_link:
+        most_relevant_trust_boundary: local-user-workstation
+        most_relevant_shared_runtime:
+
+risk_tracking:
+
+  t1-api-key-plaintext-data-json@*:
+    status: in-progress # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
+    justification: Migration from plaintext `data.json` secret storage to safer storage is in progress.
+    ticket: T1
+    date: 2026-03-09
+    checked_by: vonst
+
+  t3-audio-output-path-traversal@*:
+    status: in-progress # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
+    justification: Path canonicalization and vault-root enforcement are being implemented.
+    ticket: T3
+    date: 2026-03-09
+    checked_by: vonst
+
+  t8-api-key-logging-leak@*:
+    status: unchecked # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
+    justification: Redaction policy and automated log leakage checks still need verification.
+    ticket: T8
+    date: 2026-03-09
+    checked_by: vonst
