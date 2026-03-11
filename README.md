@@ -18,7 +18,7 @@ The current threat analysis [report](docs/report.pdf).
 
 Custom risk categories are currently defined for:
 
-- **T1**: API key stored in plaintext plugin settings (`data.json`)
+- **T1**: API key stored in plaintext plugin settings.ts
 - **T3**: audio output path traversal risk during vault writes
 - **T8**: API key leakage risk via logs/console output
 
