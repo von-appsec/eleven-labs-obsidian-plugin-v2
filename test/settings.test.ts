@@ -1,8 +1,8 @@
-import { DEFAULT_SETTINGS } from "../src/settings";
+import { DEFAULT_SETTINGS, DEFAULT_SECRETS } from "../src/settings";
 
 describe("default settings", () => {
     it("should set api key to empty string", () => {
-        expect(DEFAULT_SETTINGS.apiKey).toBe("");
+        expect(DEFAULT_SECRETS.apiKey).toBe("");
     });
 
     it("should set selected voice id to null", () => {

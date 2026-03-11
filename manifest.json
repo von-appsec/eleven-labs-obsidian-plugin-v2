@@ -1,11 +1,11 @@
 {
-	"id": "eleven-labs",
-	"name": "Eleven Labs",
-	"version": "1.1.0",
+	"id": "eleven-labs-v2",
+	"name": "Eleven Labs v2",
+	"version": "2.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Turn your Obsidian notes into text-to-speech audio files with Eleven Labs.",
-	"author": "Mark Charles",
-	"authorUrl": "https://github.com/veritas1",
-	"fundingUrl": "https://www.buymeacoffee.com/veritas0x1",
+	"author": "Vonique Stricklen",
+	"authorUrl": "https://github.com/von-appsec",
+	"fundingUrl": "https://buymeacoffee.com/vonstrick",
 	"isDesktopOnly": false
 }

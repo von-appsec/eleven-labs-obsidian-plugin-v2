@@ -1,7 +1,7 @@
-module.exports = {
-    App: class {},
-    PluginSettingTab: class {},
-    Setting: class {},
-    // Vault: class {},
-    // Add other mocks as needed
-};
+export class App {}
+export class PluginSettingTab {}
+export class Setting {}
+export class Plugin {}
+export class Notice {}
+export class MarkdownView {}
+export class Vault {}
