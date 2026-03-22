@@ -1,5 +1,5 @@
-import { Notice, MarkdownView } from "obsidian";
-import ElevenLabsApi, { VoiceSettings } from "src/eleven_labs_api";
+import { Notice } from "obsidian";
+import ElevenLabsApi from "src/eleven_labs_api";
 import ElevenLabsPlugin from "main";
 
 export async function generateAudio(
