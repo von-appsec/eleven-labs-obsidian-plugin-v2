@@ -1,92 +1,39 @@
-import { Notice, MarkdownView, Vault } from "obsidian";
-import { generateFilename } from "./file";
+import { Notice, MarkdownView } from "obsidian";
 import ElevenLabsApi, { VoiceSettings } from "src/eleven_labs_api";
 import ElevenLabsPlugin from "main";
-
-function createAudioNote(
-    vault: Vault,
-    text: string,
-    filename: string,
-    voiceName: string,
-    modelName: string,
-    enabled: boolean,
-    stability: number,
-    similarityBoost: number,
-    date: Date,
-    notePath: string | undefined
-) {
-    const content = `
-**Voice:** ${voiceName}
-**Model:** ${modelName}
-**Created:** ${date.toLocaleString()}
-**Voice Settings Enabled:** ${enabled}
-**Stability:** ${stability}
-**Similarity Boost:** ${similarityBoost}
-**Note:** [[${notePath}]]
-
-${text.split("\n").map(line => `> ${line}`).join("\n")}
-
-![[ElevenLabs/Audio/${filename}.mp3]]
-
----
-`;
-    vault.create(`ElevenLabs/${filename}.md`, content);
-}
-
-function createAudioFile(vault: Vault, filename: string, data: any) {
-    vault.createBinary(`ElevenLabs/Audio/${filename}.mp3`, data);
-}
 
 export async function generateAudio(
     plugin: ElevenLabsPlugin,
     text: string,
-    voiceName: string,
     voiceId: string,
-    modelName: string,
     modelId: string,
-    enabled: boolean,
-    stability: number,
-    similarityBoost: number
 ) {
-    let voiceSettings: VoiceSettings | undefined = undefined;
-    if (enabled) {
-        voiceSettings = {
-            stability: stability,
-            similarity_boost: similarityBoost,
-        };
-    }
-
-    const activeView = plugin.app.workspace.getActiveViewOfType(MarkdownView);
-    const notePath = activeView?.file?.basename;
 
     try {
+        new Notice("Eleven Labs: Generating audio...", 3000);
+
         const response = await ElevenLabsApi.textToSpeech(
             plugin.secrets.apiKey,
             text,
             voiceId,
             modelId,
-            voiceSettings
         );
 
-        const date = new Date();
-        const filename = generateFilename(voiceName, date);
+        if (response.status !== 200) {
+            console.error("ElevenLabs: TTS request failed with status:", response.status);
+            new Notice("Eleven Labs: Failed to generate audio. Check your API key and settings.", 5000);
+            return;
+        }
 
-        createAudioFile(plugin.app.vault, filename, response.arrayBuffer);
-        createAudioNote(
-            plugin.app.vault,
-            text,
-            filename,
-            voiceName,
-            modelName,
-            enabled,
-            stability,
-            similarityBoost,
-            date,
-            notePath
-        );
-        new Notice(`Eleven Labs: Created audio file (${filename})`, 5000);
+        // Play audio directly in memory — no file writes, works on mobile
+        const blob = new Blob([response.arrayBuffer], { type: "audio/mpeg" });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.onended = () => URL.revokeObjectURL(url);
+        await audio.play();
+ 
     } catch (error) {
-        console.error("ElevenLabs: failed to generate audio. Check your API key in settings.");
+        console.error("ElevenLabs: failed to generate or play audio.");
         new Notice("Eleven Labs: Failed to generate audio. Check your API key.", 5000);
     }
 }
