@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.0.1](https://github.com/von-appsec/eleven-labs-obsidian-plugin-v2/compare/v1.0.0...v1.0.1) (2026-03-22)
+
+
+### Bug Fixes
+
+* **api:** remove debug console.log calls and clean up request headers ([d5fbe6f](https://github.com/von-appsec/eleven-labs-obsidian-plugin-v2/commit/d5fbe6fdc11f07e62968ff34ff7fd06f0df0fe17))
+* **audio:** play TTS output in-memory via Blob/Audio instead of writing to vault ([cdf1193](https://github.com/von-appsec/eleven-labs-obsidian-plugin-v2/commit/cdf1193e4b726728a9588b84669b35b1c92c0797))
+* **plugin:** await voice/model loading and guard empty arrays on startup ([4d528d2](https://github.com/von-appsec/eleven-labs-obsidian-plugin-v2/commit/4d528d22ff4380a2650a0b62eddf47c8666a59f9))
+* **ui:** guard against missing model/voice data and refresh on modal open ([72fb102](https://github.com/von-appsec/eleven-labs-obsidian-plugin-v2/commit/72fb1022a3e36b8f588100c196d1cf271d13bc81))
+
 ## 1.0.0 (2026-03-07)
 
 
