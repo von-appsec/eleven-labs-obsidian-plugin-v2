@@ -66,10 +66,10 @@ export default class ElevenLabsPlugin extends Plugin {
         await this.loadSettings();
 
         // Load voices
-        this.loadVoices();
+        await this.loadVoices();
 
         // Load models
-        this.loadModels();
+        await this.loadModels();
 
         // Add context menu item
         this.app.workspace.on("editor-menu", this.addContextMenuItems);
@@ -92,7 +92,7 @@ export default class ElevenLabsPlugin extends Plugin {
             );
             this.voices = response.json.voices;
         } catch (error) {
-            console.log("ElevenLabs: failed to load voices. Check your API key in settings.");
+            this.voices = [];
         }
     }
 
@@ -105,21 +105,17 @@ export default class ElevenLabsPlugin extends Plugin {
                 (m: any) => m.can_do_text_to_speech
             );
         } catch (error) {
-            console.log("ElevenLabs: failed to load models. Check your API key in settings.");
+            this.models = [];
         }
     }
 
     async loadSettings() {
-        this.settings = Object.assign(
-            {},
-            DEFAULT_SETTINGS,
-            await this.loadData()
-        );
-        const savedSecrets = await this.loadData();
+        const saved = await this.loadData();
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
         this.secrets = Object.assign(
             {},
             DEFAULT_SECRETS,
-            { apiKey: savedSecrets?.apiKey ?? "" }
+            { apiKey: saved?.apiKey ?? "" }
         );
     }
 
