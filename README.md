@@ -18,11 +18,11 @@ The current threat analysis [report](docs/report.pdf).
 
 Custom risk categories are currently defined for:
 
-- **T1**: API key stored in plaintext plugin settings.ts
-- **T3**: audio output path traversal risk during vault writes
-- **T8**: API key leakage risk via console.log output
+- **T1**: API key stored in plaintext plugin settings — **accepted risk**
+- **T3**: audio output path traversal risk during vault writes — **not present**
+- **T8**: API key leakage risk via console.log output — **not present**
 
-Risk tracking entries for these items are seeded in the same model file and are used to drive the release roadmap above.
+For detailed information see the [Threagile Report](./docs/report.pdf).
 
 ## Security roadmap
 
@@ -32,33 +32,32 @@ Risk tracking entries for these items are seeded in the same model file and are 
 
 ## How to use
 
-Once the plugin is installed, head to the plugin settings page in Obsidian and paste in your api key.
+### 1. Configure the plugin
 
-![Settings Api Key](/images/image9.png)
+Open **Settings → Community Plugins → Eleven Labs** and enter your API key. While the settings panel is open, select your preferred **Voice** and **Model** from the dropdowns — these are loaded from your ElevenLabs account.
 
-In your notes, when in **edit mode**, simply highlight the text you want to use, right click and select "Eleven Labs" from the context menu.
+### 2. Select text
 
-![Highlight text](/images/image2.png)
+In any note, switch to **edit mode** and highlight the text you want read aloud.
 
-If you prefer, you can trigger the modal using the Command Palette (`CTRL` + `p`).
+### 3. Trigger playback
 
-![Commmand Palette](/images/command-palette.png)
+Use any of the three entry points — they all share the same playback state:
 
-You'll then be presented with a modal, where you can select a voice to use from your Eleven Labs account:
+- **Command palette** — open with `Ctrl/Cmd + P` and run `Read aloud / Pause / Resume`
+- **Ribbon icon** — click the audio icon in the left sidebar (touch-friendly on mobile)
+- **Right-click context menu** — select **Read aloud** from the editor context menu
 
-![Modal](/images/image3.png)
+### 4. In-editor highlight
 
-Override the voice settings:
+While audio plays, the selected text is highlighted directly in the editor. The highlight persists through pause and clears automatically when playback ends.
 
-![Voice settings](/images/image4.png)
+### 5. Pause and resume
 
-Select which model to use, allowing multilingual output:
+Trigger the same entry point again to **pause**, and again to **resume**:
 
-![Model Select](/images/model-select.png)
-
-Now you can generate your audio, by pressing the "Generate audio" button. This will happen in the background and can take a few minutes depending on the number of characters being processed. You will get a notification once the audio has been generated and downloaded to your vault.
-
-![Generating notice](/images/image5.png)
-![Audio file complete notice](/images/image6.png)
-![File tree](/images/image7.png)
-![Generated note](/images/image8.png)
+| State | Command palette | Ribbon icon | Context menu |
+|-------|----------------|-------------|--------------|
+| Idle (text selected) | Read aloud | Play | Read aloud |
+| Playing | Pause | Pause | Pause |
+| Paused | Resume | Resume | Resume |

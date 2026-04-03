@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.2.0 (2026-04-03)
+
+
+### Features
+
+* switch TTS trigger to `textToSpeechWithTimestamps` endpoint for word-by-word synchronized highlighting
+* add `requestAnimationFrame`-based highlight loop replacing `ontimeupdate` for frame-rate word tracking
+* add binary search over word ranges per RAF tick for O(log n) highlight dispatch
+* add `"loading"` audio state with spinning ribbon icon (`loader` + `tts-ribbon-loading` CSS class) during API call
+* persist effective model ID immediately on Settings display to fix silent null `selectedModelId`
+* import and apply `DEFAULT_MODEL_ID` as fallback in `handleTTSTrigger` so model null never blocks playback
+
+
+### Bug Fixes
+
+* word `endTime` now set to next word's `startTime` eliminating inter-word highlight gaps
+* reset state and ribbon icon to idle on API error or non-200 response
+* `"loading"` state excluded from command palette availability check to prevent re-entrancy
+* `stopRAF()` called on `onended` and `onunload` to cancel animation frame loop on cleanup
+
+
+### Security / Threat Model
+
+* T1 risk tracking updated to `accepted` — platform constraint, compensating notice already shown in Settings
+* T3 risk tracking updated to `false-positive` — vault write code is dead; audio plays from Blob URL in memory
+* T8 risk tracking updated to `false-positive` — no `console.log` calls; no secrets in any log output
+* Regenerated all threat model outputs: `report.pdf`, `risks.json`, `risks.xlsx`, `stats.json`, `tags.xlsx`, `technical-assets.json`, `data-flow-diagram.png`, `data-asset-diagram.png`
+* Updated README with per-risk findings and final status for T1, T3, T8
+
+
 ## 2.1.0 (2026-04-03)
 
 

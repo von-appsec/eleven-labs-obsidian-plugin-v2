@@ -125,6 +125,16 @@ If your plugin does not need CSS, delete this file.
     border-radius: 2px;
 }
 
+/* Ribbon icon loading spinner */
+@keyframes tts-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+.tts-ribbon-loading svg {
+    animation: tts-spin 1s linear infinite;
+    transform-origin: center;
+}
+
 /* Text highlighting */
 .highlighted-text {
     max-height: 150px;

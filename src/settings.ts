@@ -93,7 +93,22 @@ export class ElevenLabsSettingTab extends PluginSettingTab {
                 } else {
                     models.forEach((model) => dropdown.addOption(model.model_id, model.name));
                 }
-                dropdown.setValue(this.plugin.settings.selectedModelId ?? DEFAULT_MODEL_ID);
+
+                // Resolve the effective model: use saved value, fall back to default,
+                // then fall back to first available. Persist immediately so the stored
+                // value always matches what the dropdown displays.
+                const savedModel = this.plugin.settings.selectedModelId;
+                const effectiveModel =
+                    savedModel ??
+                    (models.some((m) => m.model_id === DEFAULT_MODEL_ID)
+                        ? DEFAULT_MODEL_ID
+                        : models[0]?.model_id ?? "");
+                dropdown.setValue(effectiveModel);
+                if (!savedModel && effectiveModel) {
+                    this.plugin.settings.selectedModelId = effectiveModel;
+                    this.plugin.saveSettings();
+                }
+
                 dropdown.onChange(async (value) => {
                     this.plugin.settings.selectedModelId = value || null;
                     await this.plugin.saveSettings();
