@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.3.0 (2026-04-03)
+
+
+### Features
+
+* add discrete mobile toolbar commands: "Read aloud" (`audio-lines`), "Pause reading" (`pause`), "Resume reading" (`play`) — each pinnable to the Obsidian mobile toolbar independently
+* persist last CM6 selection via `ViewPlugin` so ribbon and toolbar commands work on Android after virtual keyboard dismisses
+* pin "Generating audio..." `Notice` for the full duration of the API call (timeout=0); hide explicitly before playback begins and on all error paths
+
+
+### Bug Fixes
+
+* toolbar commands use `checkCallback` so they only appear active when the corresponding audio state is reachable
+* `onunload` clears saved selection state to prevent stale Android fallback references
+
+
+---
+
 ## 2.2.0 (2026-04-03)
 
 

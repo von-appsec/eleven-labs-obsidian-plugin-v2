@@ -17,7 +17,7 @@ import {
 } from "./src/settings";
 import ElevenLabsApi from "./src/eleven_labs_api";
 import { Alignment } from "./src/util/audio";
-import { EditorView } from "@codemirror/view";
+import { EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { setTTSHighlight, ttsHighlightField } from "./src/tts-highlight";
 
 interface WordRange {
@@ -42,6 +42,14 @@ export default class ElevenLabsPlugin extends Plugin {
     private ribbonIconEl: HTMLElement | null = null;
     private wordRanges: WordRange[] = [];
     private rafId: number | null = null;
+
+    // Persisted selection — populated by a CM6 ViewPlugin whenever the user
+    // makes a non-empty selection. Used as fallback on Android where tapping
+    // the ribbon dismisses the keyboard and clears the live selection before
+    // the callback fires.
+    private savedText: string = "";
+    private savedSelFrom: number = 0;
+    private savedCmEditor: EditorView | null = null;
 
     addContextMenuItems = (
         menu: Menu,
@@ -68,7 +76,26 @@ export default class ElevenLabsPlugin extends Plugin {
     };
 
     registerTTSEditorExtension() {
-        this.registerEditorExtension(ttsHighlightField);
+        // Capture selection state on every selection change so the ribbon trigger
+        // on Android can fall back to the last known selection (the live selection
+        // is gone by the time the ribbon callback fires on mobile).
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
+        const plugin = this;
+        const selectionTracker = ViewPlugin.fromClass(
+            class {
+                update(update: ViewUpdate) {
+                    if (!update.selectionSet) return;
+                    const sel = update.state.selection.main;
+                    if (sel.empty) return;
+                    const text = update.state.sliceDoc(sel.from, sel.to);
+                    if (!text.trim()) return;
+                    plugin.savedText = text;
+                    plugin.savedSelFrom = sel.from;
+                    plugin.savedCmEditor = update.view;
+                }
+            }
+        );
+        this.registerEditorExtension([ttsHighlightField, selectionTracker]);
     }
 
     async handleTTSTrigger() {
@@ -87,14 +114,17 @@ export default class ElevenLabsPlugin extends Plugin {
         }
 
         // idle — require selected text and configured voice/model
+        // On Android the ribbon tap dismisses the keyboard before the callback
+        // fires, clearing the live selection. Fall back to the last selection
+        // captured by the CM6 selection tracker.
         const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-        if (!markdownView) {
-            new Notice("Eleven Labs: Open a note and select text to read aloud.", 3000);
+        const liveText = markdownView?.editor.getSelection() ?? "";
+        const selectedText = liveText || this.savedText;
+
+        if (!selectedText) {
+            new Notice("Eleven Labs: Select text in a note first.", 3000);
             return;
         }
-
-        const selectedText = markdownView.editor.getSelection();
-        if (!selectedText) return;
 
         const voiceId = this.settings.selectedVoiceId;
         const modelId = this.settings.selectedModelId ?? DEFAULT_MODEL_ID;
@@ -103,17 +133,24 @@ export default class ElevenLabsPlugin extends Plugin {
             return;
         }
 
-        // Capture the CM6 editor reference and selection start before the async
-        // network call so the highlight is anchored even if focus moves.
-        const cmEditor = (markdownView.editor as any)?.cm as EditorView | undefined;
-        const selFrom = cmEditor?.state.selection.main.from ?? 0;
+        // Resolve CM6 editor and selection-start offset:
+        // prefer the live editor when text is freshly selected; use the saved
+        // editor reference when falling back to the Android saved-selection path.
+        const liveCm = (markdownView?.editor as any)?.cm as EditorView | undefined;
+        const cmEditor = liveCm ?? this.savedCmEditor ?? undefined;
+        const selFrom = (liveText && liveCm)
+            ? liveCm.state.selection.main.from
+            : this.savedSelFrom;
 
         // Show loading spinner on ribbon while the API call is in-flight
         this.audioState = "loading";
         this.updateRibbonIcon();
 
+        // Timeout 0 keeps the notice pinned until we manually hide it, so
+        // mobile users can see it for the full duration of the API call.
+        const generatingNotice = new Notice("Eleven Labs: Generating audio...", 0);
+
         try {
-            new Notice("Eleven Labs: Generating audio...", 3000);
 
             const voiceSettingsEntry = this.settings.voiceSettings?.[voiceId];
             const voiceOptions = voiceSettingsEntry?.enabled ? voiceSettingsEntry : undefined;
@@ -127,6 +164,7 @@ export default class ElevenLabsPlugin extends Plugin {
             );
 
             if (response.status !== 200) {
+                generatingNotice.hide();
                 this.audioState = "idle";
                 this.updateRibbonIcon();
                 new Notice("Eleven Labs: Failed to generate audio. Check your API key.", 5000);
@@ -169,11 +207,13 @@ export default class ElevenLabsPlugin extends Plugin {
                 this.updateRibbonIcon();
             };
 
+            generatingNotice.hide();
             await audio.play();
             this.audioState = "playing";
             this.updateRibbonIcon();
             this.startRAF(audio);
         } catch (error) {
+            generatingNotice.hide();
             this.audioState = "idle";
             this.updateRibbonIcon();
             console.error("ElevenLabs: failed to generate or play audio.", error);
@@ -308,9 +348,53 @@ export default class ElevenLabsPlugin extends Plugin {
             name: "Read aloud / Pause / Resume",
             checkCallback: (checking: boolean) => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                const hasSelection = !!view?.editor.getSelection() || !!this.savedText;
                 const available =
                     (this.audioState === "playing" || this.audioState === "paused") ||
-                    (this.audioState === "idle" && !!view?.editor.getSelection());
+                    (this.audioState === "idle" && hasSelection);
+                if (available && !checking) {
+                    this.handleTTSTrigger();
+                }
+                return available;
+            },
+        });
+
+        // Discrete toolbar commands for mobile — each maps to exactly one action
+        // so users can pin individual buttons to the Obsidian mobile toolbar.
+        this.addCommand({
+            id: "eleven-labs-tts-play",
+            name: "Read aloud",
+            icon: "audio-lines",
+            checkCallback: (checking: boolean) => {
+                const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+                const hasSelection = !!view?.editor.getSelection() || !!this.savedText;
+                const available = this.audioState === "idle" && hasSelection;
+                if (available && !checking) {
+                    this.handleTTSTrigger();
+                }
+                return available;
+            },
+        });
+
+        this.addCommand({
+            id: "eleven-labs-tts-pause",
+            name: "Pause reading",
+            icon: "pause",
+            checkCallback: (checking: boolean) => {
+                const available = this.audioState === "playing";
+                if (available && !checking) {
+                    this.handleTTSTrigger();
+                }
+                return available;
+            },
+        });
+
+        this.addCommand({
+            id: "eleven-labs-tts-resume",
+            name: "Resume reading",
+            icon: "play",
+            checkCallback: (checking: boolean) => {
+                const available = this.audioState === "paused";
                 if (available && !checking) {
                     this.handleTTSTrigger();
                 }
@@ -342,6 +426,8 @@ export default class ElevenLabsPlugin extends Plugin {
         this.stopRAF();
         this.clearTTSHighlight();
         this.wordRanges = [];
+        this.savedText = "";
+        this.savedCmEditor = null;
         this.audioState = "idle";
         this.app.workspace.off("editor-menu", this.addContextMenuItems);
     }
