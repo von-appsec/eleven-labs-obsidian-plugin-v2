@@ -64,5 +64,55 @@ export class ElevenLabsSettingTab extends PluginSettingTab {
                         await this.plugin.saveSettings();
                     });
             });
+
+        new Setting(containerEl)
+            .setName("Voice")
+            .setDesc("The voice used for text-to-speech.")
+            .addDropdown((dropdown) => {
+                const voices = this.plugin.voices ?? [];
+                if (voices.length === 0) {
+                    dropdown.addOption("", "No voices found — check API key");
+                } else {
+                    dropdown.addOption("", "Select a voice");
+                    voices.forEach((voice) => dropdown.addOption(voice.voice_id, voice.name));
+                }
+                dropdown.setValue(this.plugin.settings.selectedVoiceId ?? "");
+                dropdown.onChange(async (value) => {
+                    this.plugin.settings.selectedVoiceId = value || null;
+                    await this.plugin.saveSettings();
+                });
+            });
+
+        new Setting(containerEl)
+            .setName("Model")
+            .setDesc("The ElevenLabs model used for text-to-speech.")
+            .addDropdown((dropdown) => {
+                const models = this.plugin.models ?? [];
+                if (models.length === 0) {
+                    dropdown.addOption("", "No models found — check API key");
+                } else {
+                    models.forEach((model) => dropdown.addOption(model.model_id, model.name));
+                }
+
+                // Resolve the effective model: use saved value, fall back to default,
+                // then fall back to first available. Persist immediately so the stored
+                // value always matches what the dropdown displays.
+                const savedModel = this.plugin.settings.selectedModelId;
+                const effectiveModel =
+                    savedModel ??
+                    (models.some((m) => m.model_id === DEFAULT_MODEL_ID)
+                        ? DEFAULT_MODEL_ID
+                        : models[0]?.model_id ?? "");
+                dropdown.setValue(effectiveModel);
+                if (!savedModel && effectiveModel) {
+                    this.plugin.settings.selectedModelId = effectiveModel;
+                    this.plugin.saveSettings();
+                }
+
+                dropdown.onChange(async (value) => {
+                    this.plugin.settings.selectedModelId = value || null;
+                    await this.plugin.saveSettings();
+                });
+            });
     }
 }

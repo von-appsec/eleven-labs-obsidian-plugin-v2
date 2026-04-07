@@ -1,6 +1,6 @@
 {
 	"name": "eleven-labs-obsidian-plugin",
-	"version": "1.0.0",
+	"version": "2.3.0",
 	"description": "Turn your Obsidian notes into TTS audio files with Eleven Labs.",
 	"main": "main.js",
 	"scripts": {
@@ -16,6 +16,8 @@
 		"@babel/core": "^7.22.11",
 		"@babel/preset-env": "^7.22.10",
 		"@babel/preset-typescript": "^7.22.11",
+		"@codemirror/state": "^6.6.0",
+		"@codemirror/view": "^6.41.0",
 		"@testing-library/dom": "^9.3.1",
 		"@types/jest": "^29.5.4",
 		"@types/node": "^16.11.6",

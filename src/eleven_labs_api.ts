@@ -75,6 +75,42 @@ class ElevenLabsApi {
             throw error;
         }
     }
+
+    static async textToSpeechWithTimestamps(
+        apiKey: string,
+        text: string,
+        voiceId: string,
+        modelId: string,
+        options?: VoiceSettings
+    ) {
+        const data: TextToSpeechRequest = {
+            model_id: modelId,
+            text: text,
+        };
+        if (options) {
+            const settings: VoiceSettings = {
+                stability: options.stability / 100.0,
+                similarity_boost: options.similarity_boost / 100.0,
+            };
+            data.voice_settings = settings;
+        }
+
+        try {
+            return await requestUrl({
+                url: `${BASE_URL}/text-to-speech/${voiceId}/with-timestamps`,
+                method: "POST",
+                contentType: "application/json",
+                headers: {
+                    "Accept": "application/json",
+                    "xi-api-key": apiKey,
+                },
+                body: JSON.stringify(data),
+            });
+        } catch (error) {
+            console.error("[ElevenLabsApi.textToSpeechWithTimestamps] Request failed");
+            throw error;
+        }
+    }
 }
 
 export default ElevenLabsApi;

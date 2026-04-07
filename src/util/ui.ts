@@ -7,16 +7,163 @@ import {
     ToggleComponent,
 } from "obsidian";
 import { VoiceSettings, DEFAULT_MODEL_ID } from "src/settings";
+import { Alignment } from "src/util/audio";
+
+interface WordTimestamp {
+    word: string;
+    start: number;
+    end: number;
+}
+
+function buildWordTimestamps(alignment: Alignment): WordTimestamp[] {
+    const words: WordTimestamp[] = [];
+    let currentWord = "";
+    let wordStart = 0;
+    let wordEnd = 0;
+
+    for (let i = 0; i < alignment.characters.length; i++) {
+        const char = alignment.characters[i];
+        const start = alignment.character_start_times_seconds[i];
+        const end = alignment.character_end_times_seconds[i];
+
+        if (char === " " || char === "\n" || char === "\t") {
+            if (currentWord.length > 0) {
+                words.push({ word: currentWord, start: wordStart, end: wordEnd });
+                currentWord = "";
+            }
+        } else {
+            if (currentWord.length === 0) wordStart = start;
+            currentWord += char;
+            wordEnd = end;
+        }
+    }
+
+    if (currentWord.length > 0) {
+        words.push({ word: currentWord, start: wordStart, end: wordEnd });
+    }
+    return words;
+}
 
 export function renderGenerateAudioButton(
     parent: HTMLElement,
-    callback: () => void
-) {
-    // Generate audio button
-    new ButtonComponent(parent)
+    callback: () => void | Promise<void>
+): ButtonComponent {
+    return new ButtonComponent(parent)
         .setClass("btn-generate-audio")
         .setButtonText("Generate audio")
         .onClick(callback);
+}
+
+export function showHighlightedText(
+    container: HTMLElement,
+    selectedText: string,
+    alignment: Alignment,
+    audio: HTMLAudioElement
+): void {
+    container.empty();
+    container.createEl("h6", { text: "Text" });
+
+    const textDisplay = container.createDiv("highlighted-text");
+    const wordTimestamps = buildWordTimestamps(alignment);
+    let textIndex = 0;
+    const wordSpans: HTMLElement[] = [];
+
+    for (const wt of wordTimestamps) {
+        const idx = selectedText.indexOf(wt.word, textIndex);
+        if (idx === -1) continue;
+
+        if (idx > textIndex) {
+            textDisplay.appendText(selectedText.slice(textIndex, idx));
+        }
+
+        const span = textDisplay.createEl("span", { text: wt.word, cls: "highlight-word" });
+        span.dataset.start = String(wt.start);
+        span.dataset.end = String(wt.end);
+        wordSpans.push(span);
+        textIndex = idx + wt.word.length;
+    }
+
+    if (textIndex < selectedText.length) {
+        textDisplay.appendText(selectedText.slice(textIndex));
+    }
+
+    container.createDiv("char-count").setText(`Characters: ${selectedText.length}`);
+
+    audio.addEventListener("timeupdate", () => {
+        const currentTime = audio.currentTime;
+        wordSpans.forEach(span => {
+            const start = parseFloat(span.dataset.start ?? "0");
+            const end = parseFloat(span.dataset.end ?? "0");
+            if (currentTime >= start && currentTime < end) {
+                span.addClass("active");
+            } else {
+                span.removeClass("active");
+            }
+        });
+    });
+
+    audio.addEventListener("ended", () => {
+        wordSpans.forEach(span => span.removeClass("active"));
+    });
+}
+
+export function renderPlaybackControls(
+    parent: HTMLElement,
+    audio: HTMLAudioElement
+): void {
+    const container = parent.createDiv("playback-controls");
+
+    const playPauseBtn = new ButtonComponent(container)
+        .setClass("playback-btn");
+
+    const updateBtn = () => {
+        playPauseBtn.setButtonText(audio.paused ? "▶  Play" : "⏸  Pause");
+    };
+    updateBtn();
+
+    playPauseBtn.onClick(() => {
+        if (audio.paused) {
+            audio.play();
+        } else {
+            audio.pause();
+        }
+    });
+
+    audio.addEventListener("play", updateBtn);
+    audio.addEventListener("pause", updateBtn);
+    audio.addEventListener("ended", updateBtn);
+
+    const progressBar = container.createEl("input", { cls: "playback-progress" }) as HTMLInputElement;
+    progressBar.type = "range";
+    progressBar.min = "0";
+    progressBar.max = "100";
+    progressBar.value = "0";
+    progressBar.step = "0.1";
+
+    const timeLabel = container.createDiv("time-label");
+    timeLabel.setText("0:00 / 0:00");
+
+    const formatTime = (seconds: number): string => {
+        const m = Math.floor(seconds / 60);
+        const s = Math.floor(seconds % 60).toString().padStart(2, "0");
+        return `${m}:${s}`;
+    };
+
+    const updateProgress = () => {
+        if (audio.duration) {
+            progressBar.value = String((audio.currentTime / audio.duration) * 100);
+            timeLabel.setText(`${formatTime(audio.currentTime)} / ${formatTime(audio.duration)}`);
+        }
+    };
+
+    audio.addEventListener("timeupdate", updateProgress);
+    audio.addEventListener("loadedmetadata", updateProgress);
+
+    progressBar.addEventListener("input", () => {
+        if (audio.duration) {
+            audio.currentTime = (parseFloat(progressBar.value) / 100) * audio.duration;
+        }
+    });
 }
 
 export function renderModelLanguageChips(
@@ -113,21 +260,15 @@ export function renderVoiceSettings(
     };
 }
 
-export function renderTextSection(parent: HTMLElement, selectedText: string) {
-    parent.createDiv("eleven-labs-text-area", (el) => {
-        // Title
-        el.createEl("h6", { text: "Text" });
-
-        // Text area
-        new TextAreaComponent(el)
-            .setPlaceholder("Enter text here")
-            .setValue(selectedText)
-            .setDisabled(true);
-
-        // Character count
-        const charCountEl = el.createDiv("char-count");
-        charCountEl.setText(`Characters: ${selectedText.length}`);
-    });
+export function renderTextSection(parent: HTMLElement, selectedText: string): HTMLElement {
+    const container = parent.createDiv("eleven-labs-text-area");
+    container.createEl("h6", { text: "Text" });
+    new TextAreaComponent(container)
+        .setPlaceholder("Enter text here")
+        .setValue(selectedText)
+        .setDisabled(true);
+    container.createDiv("char-count").setText(`Characters: ${selectedText.length}`);
+    return container;
 }
 
 function addVoicesToOptionGroup(

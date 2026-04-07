@@ -453,22 +453,33 @@ individual_risk_categories:
 risk_tracking:
 
   t1-api-key-plaintext-data-json@*:
-    status: in-progress # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
-    justification: Migration from plaintext `data.json` secret storage to safer storage is in progress.
+    status: accepted # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
+    justification: >-
+      saveData() serialises apiKey into data.json as a plain string. The Obsidian platform
+      provides no secret store, so plaintext persistence is an unavoidable platform constraint.
+      A security notice is displayed to the user in the settings tab (src/settings.ts).
+      No code change can fully mitigate this within the plugin model; documented as accepted risk.
     ticket: T1
-    date: 2026-03-09
+    date: 2026-04-03
     checked_by: vonst
 
   t3-audio-output-path-traversal@*:
-    status: in-progress # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
-    justification: Path canonicalization and vault-root enforcement are being implemented.
+    status: false-positive # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
+    justification: >-
+      createVaultDirectories (src/util/file.ts) and generateFilename are dead code — neither
+      function is imported or called anywhere in the active codebase. No vault writes occur;
+      audio plays entirely from an in-memory Blob URL (src/util/audio.ts). Path traversal
+      via vault writes is not possible in the current implementation.
     ticket: T3
-    date: 2026-03-09
+    date: 2026-04-03
     checked_by: vonst
 
   t8-api-key-logging-leak@*:
-    status: unchecked # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
-    justification: Redaction policy and automated log leakage checks still need verification.
+    status: false-positive # values: unchecked, in-discussion, accepted, in-progress, mitigated, false-positive
+    justification: >-
+      There are no console.log calls anywhere in the project. All logging uses console.error
+      and none of those call sites include this.secrets.apiKey or any request headers —
+      only generic status messages and caught error objects are logged. Confirmed clean.
     ticket: T8
-    date: 2026-03-09
+    date: 2026-04-03
     checked_by: vonst
