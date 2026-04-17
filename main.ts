@@ -56,20 +56,31 @@ export default class ElevenLabsPlugin extends Plugin {
         _editor: Editor,
         _info: MarkdownView | MarkdownFileInfo
     ) => {
+        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const selectedText = markdownView?.editor.getSelection();
+
         if (this.audioState === "playing") {
             menu.addItem((item) =>
-                item.setTitle("Pause").setIcon("pause").onClick(() => this.handleTTSTrigger())
+                item.setTitle("Pause").setIcon("pause").onClick(() => this.handlePause())
             );
-        } else if (this.audioState === "paused") {
-            menu.addItem((item) =>
-                item.setTitle("Resume").setIcon("play").onClick(() => this.handleTTSTrigger())
-            );
-        } else {
-            const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-            const selectedText = markdownView?.editor.getSelection();
             if (selectedText) {
                 menu.addItem((item) =>
-                    item.setTitle("Read aloud").setIcon("audio-lines").onClick(() => this.handleTTSTrigger())
+                    item.setTitle("Generate new audio").setIcon("audio-lines").onClick(() => this.handleGenerateNew())
+                );
+            }
+        } else if (this.audioState === "paused") {
+            menu.addItem((item) =>
+                item.setTitle("Resume").setIcon("play").onClick(() => this.handleResume())
+            );
+            if (selectedText) {
+                menu.addItem((item) =>
+                    item.setTitle("Generate new audio").setIcon("audio-lines").onClick(() => this.handleGenerateNew())
+                );
+            }
+        } else if (this.audioState === "idle") {
+            if (selectedText) {
+                menu.addItem((item) =>
+                    item.setTitle("Read aloud").setIcon("audio-lines").onClick(() => this.handleGenerateNew())
                 );
             }
         }
@@ -98,25 +109,60 @@ export default class ElevenLabsPlugin extends Plugin {
         this.registerEditorExtension([ttsHighlightField, selectionTracker]);
     }
 
+    private stopAndReset() {
+        if (this.currentAudio) {
+            this.currentAudio.pause();
+            this.currentAudio.onended = null;
+            this.currentAudio = null;
+        }
+        if (this.currentBlobUrl) {
+            URL.revokeObjectURL(this.currentBlobUrl);
+            this.currentBlobUrl = null;
+        }
+        this.stopRAF();
+        this.clearTTSHighlight();
+        this.wordRanges = [];
+        this.audioState = "idle";
+    }
+
+    handlePause() {
+        if (this.audioState !== "playing") return;
+        this.currentAudio!.pause();
+        this.audioState = "paused";
+        this.updateRibbonIcon();
+    }
+
+    async handleResume() {
+        if (this.audioState !== "paused") return;
+        await this.currentAudio!.play();
+        this.audioState = "playing";
+        this.updateRibbonIcon();
+    }
+
+    async handleGenerateNew() {
+        if (this.audioState === "loading") return;
+        if (this.audioState === "playing" || this.audioState === "paused") {
+            this.stopAndReset();
+        }
+        await this.generateAndPlay();
+    }
+
+    // Ribbon left-click: pure pause/resume toggle; idle falls through to generate.
     async handleTTSTrigger() {
         if (this.audioState === "playing") {
-            this.currentAudio!.pause();
-            this.audioState = "paused";
-            this.updateRibbonIcon();
+            this.handlePause();
             return;
         }
-
         if (this.audioState === "paused") {
-            await this.currentAudio!.play();
-            this.audioState = "playing";
-            this.updateRibbonIcon();
+            await this.handleResume();
             return;
         }
+        if (this.audioState === "idle") {
+            await this.handleGenerateNew();
+        }
+    }
 
-        // idle — require selected text and configured voice/model
-        // On Android the ribbon tap dismisses the keyboard before the callback
-        // fires, clearing the live selection. Fall back to the last selection
-        // captured by the CM6 selection tracker.
+    private async generateAndPlay() {
         const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
         const liveText = markdownView?.editor.getSelection() ?? "";
         const selectedText = liveText || this.savedText;
@@ -142,7 +188,6 @@ export default class ElevenLabsPlugin extends Plugin {
             ? liveCm.state.selection.main.from
             : this.savedSelFrom;
 
-        // Show loading spinner on ribbon while the API call is in-flight
         this.audioState = "loading";
         this.updateRibbonIcon();
 
@@ -151,7 +196,6 @@ export default class ElevenLabsPlugin extends Plugin {
         const generatingNotice = new Notice("Eleven Labs: Generating audio...", 0);
 
         try {
-
             const voiceSettingsEntry = this.settings.voiceSettings?.[voiceId];
             const voiceOptions = voiceSettingsEntry?.enabled ? voiceSettingsEntry : undefined;
 
@@ -190,7 +234,6 @@ export default class ElevenLabsPlugin extends Plugin {
             this.currentAudio = audio;
             this.currentBlobUrl = blobUrl;
 
-            // Build word-level ranges with timing from the character alignment data
             if (cmEditor) {
                 this.ttsEditorView = cmEditor;
                 this.wordRanges = this.buildWordRanges(alignment, selFrom);
@@ -306,6 +349,33 @@ export default class ElevenLabsPlugin extends Plugin {
         }
     }
 
+    private showElevenLabsMenu(e: MouseEvent) {
+        const menu = new Menu();
+        const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
+        const selectedText = markdownView?.editor.getSelection();
+
+        if (selectedText || this.savedText) {
+            menu.addItem((item) =>
+                item.setTitle("Generate new audio").setIcon("audio-lines").onClick(() => this.handleGenerateNew())
+            );
+        }
+
+        if (this.audioState === "playing" || this.audioState === "paused") {
+            menu.addSeparator();
+            if (this.audioState === "playing") {
+                menu.addItem((item) =>
+                    item.setTitle("Pause").setIcon("pause").onClick(() => this.handlePause())
+                );
+            } else {
+                menu.addItem((item) =>
+                    item.setTitle("Resume").setIcon("play").onClick(() => this.handleResume())
+                );
+            }
+        }
+
+        menu.showAtMouseEvent(e);
+    }
+
     private updateRibbonIcon() {
         if (!this.ribbonIconEl) return;
         if (this.audioState === "loading") {
@@ -359,19 +429,16 @@ export default class ElevenLabsPlugin extends Plugin {
             },
         });
 
-        // Discrete toolbar commands for mobile — each maps to exactly one action
-        // so users can pin individual buttons to the Obsidian mobile toolbar.
+        // Discrete toolbar commands — pin individual buttons to the mobile toolbar or assign hotkeys.
         this.addCommand({
-            id: "eleven-labs-tts-play",
-            name: "Read aloud",
+            id: "eleven-labs-tts-generate",
+            name: "Generate new audio",
             icon: "audio-lines",
             checkCallback: (checking: boolean) => {
                 const view = this.app.workspace.getActiveViewOfType(MarkdownView);
                 const hasSelection = !!view?.editor.getSelection() || !!this.savedText;
-                const available = this.audioState === "idle" && hasSelection;
-                if (available && !checking) {
-                    this.handleTTSTrigger();
-                }
+                const available = this.audioState !== "loading" && hasSelection;
+                if (available && !checking) this.handleGenerateNew();
                 return available;
             },
         });
@@ -382,32 +449,33 @@ export default class ElevenLabsPlugin extends Plugin {
             icon: "pause",
             checkCallback: (checking: boolean) => {
                 const available = this.audioState === "playing";
-                if (available && !checking) {
-                    this.handleTTSTrigger();
-                }
+                if (available && !checking) this.handlePause();
                 return available;
             },
         });
 
         this.addCommand({
-            id: "eleven-labs-tts-resume",
+            id: "eleven-labs-tts-play",
             name: "Resume reading",
             icon: "play",
             checkCallback: (checking: boolean) => {
                 const available = this.audioState === "paused";
-                if (available && !checking) {
-                    this.handleTTSTrigger();
-                }
+                if (available && !checking) this.handleResume();
                 return available;
             },
         });
 
-        // Ribbon icon — touch-accessible trigger for mobile
+        // Ribbon icon — left-click: pause/resume toggle; right-click: Eleven Labs menu.
         this.ribbonIconEl = this.addRibbonIcon(
             "audio-lines",
             "Read selected text aloud",
             () => { this.handleTTSTrigger(); }
         );
+        this.ribbonIconEl.addEventListener("contextmenu", (e: MouseEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.showElevenLabsMenu(e);
+        });
 
         // This adds a settings tab so the user can configure various aspects of the plugin
         this.addSettingTab(new ElevenLabsSettingTab(this.app, this));
