@@ -6,6 +6,8 @@ This project allows you to create text-to-speech audio files using the Eleven La
 
 This requires an Eleven Labs (https://elevenlabs.io) account, and api key. You can retrieve your api key from "Profile Settings", when signed into the Eleven Labs web dashboard.
 
+A free ElevenLabs account is supported, but usage is limited to 20,000 characters and 10,000 Multilingual v2/v3 characters per month. For higher limits, a paid subscription is required. See [ElevenLabs API pricing](https://elevenlabs.io/pricing/api) for details.
+
 ## Project background
 
 This repository is a fork of the original 1.x project at https://github.com/veritas1/eleven-labs-obsidian-plugin.
