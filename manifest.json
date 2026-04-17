@@ -1,7 +1,7 @@
 {
 	"id": "eleven-labs-v2",
 	"name": "Eleven Labs v2",
-	"version": "2.3.0",
+	"version": "2.4.0",
 	"minAppVersion": "0.15.0",
 	"description": "Turn your Obsidian notes into text-to-speech audio files with Eleven Labs.",
 	"author": "Vonique Stricklen",
